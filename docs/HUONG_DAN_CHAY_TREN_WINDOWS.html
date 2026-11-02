@@ -43,7 +43,13 @@ email thật.</p>
 <p>Thực hiện trong <strong>PowerShell</strong>
 (<code>Start &gt; PowerShell</code>). Đường dẫn dùng dấu <code>\</code>.
 Các lệnh dưới đây đã đối chiếu với cấu hình dự án; các bước riêng của
-PowerShell <strong>[Cần xác minh trên Windows]</strong>.</p>
+Windows <strong>[Cần xác minh trên Windows]</strong>.</p>
+<blockquote>
+<p><strong>Phạm vi hiện tại:</strong> <code>pnpm dev</code> vẫn chạy
+bằng D1 (Cloudflare Workers) theo hướng dẫn này. Kiểm thử PostgreSQL
+(mục 1.4 và 9) là phần chuẩn bị cho việc chuyển sang Neon; chưa thay thế
+cách chạy cục bộ.</p>
+</blockquote>
 <h2 id="1-chuẩn-bị">1. Chuẩn bị</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -71,8 +77,13 @@ PowerShell <strong>[Cần xác minh trên Windows]</strong>.</p>
 <td><code>git --version</code></td>
 </tr>
 <tr class="even">
+<td>PostgreSQL</td>
+<td><strong>16</strong> (bộ cài EDB, mục 1.4)</td>
+<td><code>psql --version</code></td>
+</tr>
+<tr class="odd">
 <td>Dung lượng trống</td>
-<td>Khoảng 2 GB</td>
+<td>Khoảng 3 GB</td>
 <td></td>
 </tr>
 </tbody>
@@ -101,16 +112,55 @@ class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb3-
 <p>Nhập <code>Y</code> khi được hỏi, rồi mở lại PowerShell. Hoặc dùng
 <code>npm.cmd</code> và <code>pnpm.cmd</code> thay cho <code>npm</code>
 và <code>pnpm</code>, không cần đổi chính sách.</p>
-<h2 id="2-lấy-mã-nguồn">2. Lấy mã nguồn</h2>
+<h3 id="14-cài-postgresql-16-cho-kiểm-thử">1.4. Cài PostgreSQL 16 cho
+kiểm thử</h3>
+<p>Dùng bộ cài chính thức của EDB từ
+<code>https://www.postgresql.org/download/windows/</code>, chọn phiên
+bản <strong>16</strong>, nền tảng Windows x86-64.</p>
+<p>Trong trình cài đặt:</p>
+<ol type="1">
+<li>Giữ các thành phần mặc định, gồm <strong>Server</strong>,
+<strong>pgAdmin</strong> và <strong>Command Line Tools</strong>.</li>
+<li>Thư mục cài mặc định là
+<code>C:\Program Files\PostgreSQL\16</code>.</li>
+<li>Đặt mật khẩu cho tài khoản quản trị <code>postgres</code>.
+<strong>Ghi mật khẩu vào trình quản lý mật khẩu, không ghi vào tệp hay
+trò chuyện.</strong></li>
+<li>Giữ cổng <strong>5432</strong>.</li>
+<li>Bỏ chọn <strong>Stack Builder</strong> ở bước cuối.</li>
+</ol>
+<p>Kiểm tra dịch vụ đã chạy:</p>
 <div class="sourceCode" id="cb4"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">New-Item</span> <span class="op">-</span>ItemType Directory <span class="op">-</span>Force <span class="op">-</span>Path <span class="st">&quot;$HOME\Documents\du-an&quot;</span> <span class="op">|</span> <span class="fu">Out-Null</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cd</span> <span class="st">&quot;$HOME\Documents\du-an&quot;</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>git clone https<span class="op">://</span>github<span class="op">.</span><span class="fu">com</span><span class="op">/</span>daominhtri2025<span class="op">-</span>crypto<span class="op">/</span>VIBER_CODE<span class="op">.</span><span class="fu">git</span> viber_code</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">cd</span> viber_code</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>git checkout Son_tra_so</span></code></pre></div>
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Get-Service</span> <span class="op">-</span>Name <span class="st">&quot;postgresql*&quot;</span></span></code></pre></div>
+<p>Trạng thái phải là <code>Running</code>. Nếu là <code>Stopped</code>,
+chạy <code>Start-Service &lt;tên-dịch-vụ-hiện-ra&gt;</code> với quyền
+quản trị.</p>
+<p>Tạo người dùng và cơ sở dữ liệu thử nghiệm. Thay
+<code>&lt;mật-khẩu-thử-nghiệm&gt;</code> bằng mật khẩu bạn tự chọn cho
+người dùng <code>sontra</code>. Lệnh sẽ hỏi mật khẩu của
+<code>postgres</code> khi chạy:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="va">$psql</span> <span class="op">=</span> <span class="st">&quot;C:\Program Files\PostgreSQL\16\bin\psql.exe&quot;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="op">&amp;</span> <span class="va">$psql</span> <span class="op">-</span>U postgres <span class="op">-</span>h 127<span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">1</span> <span class="op">-</span>c <span class="st">&quot;CREATE USER sontra WITH PASSWORD &#39;&lt;mật-khẩu-thử-nghiệm&gt;&#39;;&quot;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="op">&amp;</span> <span class="va">$psql</span> <span class="op">-</span>U postgres <span class="op">-</span>h 127<span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">1</span> <span class="op">-</span>c <span class="st">&quot;CREATE DATABASE sontra_test OWNER sontra;&quot;</span></span></code></pre></div>
+<p>Tên cơ sở dữ liệu <strong>phải kết thúc bằng
+<code>_test</code></strong>. Kiểm thử từ chối chạy trên tên khác để
+không xóa nhầm dữ liệu thật.</p>
+<p><strong>[Cần xác minh trên Windows]</strong> lệnh <code>psql</code>
+và <code>Get-Service</code> trên bản Windows thực tế.</p>
+<h2 id="2-lấy-mã-nguồn">2. Lấy mã nguồn</h2>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">New-Item</span> <span class="op">-</span>ItemType Directory <span class="op">-</span>Force <span class="op">-</span>Path <span class="st">&quot;$HOME\Documents\du-an&quot;</span> <span class="op">|</span> <span class="fu">Out-Null</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cd</span> <span class="st">&quot;$HOME\Documents\du-an&quot;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>git clone https<span class="op">://</span>github<span class="op">.</span><span class="fu">com</span><span class="op">/</span>daominhtri2025<span class="op">-</span>crypto<span class="op">/</span>Viber03<span class="op">.</span><span class="fu">git</span> viber_code</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="fu">cd</span> viber_code</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>git checkout Son_tra_so</span></code></pre></div>
 <ul>
-<li>Nhánh làm việc là <code>Son_tra_so</code>, không phải
-<code>main</code>.</li>
+<li>Dự án nằm ở repo <strong>Viber03</strong>, nhánh làm việc là
+<code>Son_tra_so</code>. Nhánh <code>main</code> chỉ có hai tệp mẫu,
+không dùng để chạy.</li>
+<li>Repo cũ <code>VIBER_CODE</code> vẫn giữ nguyên làm bản dự phòng;
+không dùng để cài mới.</li>
 <li>Đặt dự án ở đường dẫn ngắn nếu có thể (ví dụ
 <code>C:\dev\viber_code</code>). Đường dẫn dài có thể gây lỗi khi cài
 thư viện.</li>
@@ -118,8 +168,8 @@ thư viện.</li>
 tệp khi build.</li>
 </ul>
 <h2 id="3-cài-thư-viện">3. Cài thư viện</h2>
-<div class="sourceCode" id="cb5"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>pnpm install <span class="op">--</span>frozen<span class="op">-</span>lockfile</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>pnpm install <span class="op">--</span>frozen<span class="op">-</span>lockfile</span></code></pre></div>
 <p><code>--frozen-lockfile</code> buộc dùng đúng
 <code>pnpm-lock.yaml</code>. Nếu báo lỗi lockfile, không bỏ cờ này; báo
 người phụ trách.</p>
@@ -131,13 +181,13 @@ Exclusions</strong>).</p>
 <p>Biến môi trường cục bộ đặt trong tệp <code>.dev.vars</code> ở thư mục
 gốc dự án. Tệp này đã có trong <code>.gitignore</code>, không được
 commit.</p>
-<div class="sourceCode" id="cb6"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Copy-Item</span> <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span><span class="op">.</span><span class="fu">example</span> <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>notepad <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Copy-Item</span> <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span><span class="op">.</span><span class="fu">example</span> <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>notepad <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span></span></code></pre></div>
 <p>Nội dung tối thiểu:</p>
-<div class="sourceCode" id="cb7"><pre
-class="sourceCode ini"><code class="sourceCode ini"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="dt">OWNER_EMAIL</span><span class="ot">=</span><span class="st">seedy@sites.test</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="dt">ADMIN_PASSWORD</span><span class="ot">=</span><span class="st">&lt;mật-khẩu-của-anh-tối-thiểu-10-ký-tự&gt;</span></span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode ini"><code class="sourceCode ini"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="dt">OWNER_EMAIL</span><span class="ot">=</span><span class="st">seedy@sites.test</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="dt">ADMIN_PASSWORD</span><span class="ot">=</span><span class="st">&lt;mật-khẩu-của-anh-tối-thiểu-10-ký-tự&gt;</span></span></code></pre></div>
 <p>Bảng biến:</p>
 <div class="table-wrap"><table>
 <thead>
@@ -191,17 +241,17 @@ phiên bản Notepad đang dùng.</li>
 (như <code>MAIL_FROM</code>).</li>
 </ul>
 <p>Kiểm tra tệp không bị commit:</p>
-<div class="sourceCode" id="cb8"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>git check<span class="op">-</span>ignore <span class="op">-</span>v <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>git check<span class="op">-</span>ignore <span class="op">-</span>v <span class="op">.</span><span class="fu">dev</span><span class="op">.</span><span class="fu">vars</span></span></code></pre></div>
 <p>Phải in ra một dòng chứa <code>.dev.vars</code>. Nếu không in gì,
 dừng lại.</p>
 <p>Quy tắc: không ghi <code>ADMIN_PASSWORD</code>,
-<code>RESEND_API_KEY</code> hay token vào mã, tài liệu, ảnh chụp màn
-hình hoặc trò chuyện.</p>
+<code>RESEND_API_KEY</code>, mật khẩu PostgreSQL hay token vào mã, tài
+liệu, ảnh chụp màn hình hoặc trò chuyện.</p>
 <h2 id="5-build">5. Build</h2>
-<div class="sourceCode" id="cb9"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>pnpm build</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Test-Path</span> dist\server\wrangler<span class="op">.</span><span class="fu">json</span></span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>pnpm build</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Test-Path</span> dist\server\wrangler<span class="op">.</span><span class="fu">json</span></span></code></pre></div>
 <p>Kết quả phải là <code>True</code>. Build tạo
 <code>dist\server\wrangler.json</code> (cấu hình D1 và R2 cục bộ) và
 <code>dist\client\</code>.</p>
@@ -212,15 +262,15 @@ của môi trường Linux.</p>
 cục bộ (12 migration)</h2>
 <p>Dự án có 12 migration, <code>0000</code> đến <code>0011</code>. Thiếu
 một tệp, trang học lỗi.</p>
-<div class="sourceCode" id="cb10"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">foreach</span> <span class="op">(</span><span class="va">$migration</span> <span class="kw">in</span> <span class="op">(</span><span class="fu">Get-ChildItem</span> drizzle\<span class="op">*.</span><span class="fu">sql</span> <span class="op">|</span> <span class="fu">Sort-Object</span> Name<span class="op">))</span> <span class="op">{</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">Write-Host</span> <span class="st">&quot;Áp dụng $($migration.Name)&quot;</span></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  node <span class="op">--</span>import <span class="op">./</span>scripts<span class="op">/</span>sites<span class="op">-</span>env<span class="op">.</span><span class="fu">mjs</span> <span class="op">./</span>node_modules<span class="op">/</span>wrangler<span class="op">/</span>bin<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">js</span> d1 execute DB <span class="op">--</span>local <span class="op">--</span>config dist<span class="op">/</span>server<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">json</span> <span class="op">--</span>persist<span class="op">-</span>to <span class="op">.</span><span class="fu">wrangler</span><span class="op">/</span>state <span class="op">--</span>file <span class="va">$migration</span><span class="op">.</span><span class="fu">FullName</span></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">if</span> <span class="op">(</span><span class="va">$LASTEXITCODE</span> <span class="op">-</span>ne 0<span class="op">)</span> <span class="op">{</span> <span class="fu">Write-Host</span> <span class="st">&quot;LỖI ở $($migration.Name), dừng lại&quot;</span><span class="op">;</span> <span class="kw">break</span> <span class="op">}</span></span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">foreach</span> <span class="op">(</span><span class="va">$migration</span> <span class="kw">in</span> <span class="op">(</span><span class="fu">Get-ChildItem</span> drizzle\<span class="op">*.</span><span class="fu">sql</span> <span class="op">|</span> <span class="fu">Sort-Object</span> Name<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">Write-Host</span> <span class="st">&quot;Áp dụng $($migration.Name)&quot;</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  node <span class="op">--</span>import <span class="op">./</span>scripts<span class="op">/</span>sites<span class="op">-</span>env<span class="op">.</span><span class="fu">mjs</span> <span class="op">./</span>node_modules<span class="op">/</span>wrangler<span class="op">/</span>bin<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">js</span> d1 execute DB <span class="op">--</span>local <span class="op">--</span>config dist<span class="op">/</span>server<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">json</span> <span class="op">--</span>persist<span class="op">-</span>to <span class="op">.</span><span class="fu">wrangler</span><span class="op">/</span>state <span class="op">--</span>file <span class="va">$migration</span><span class="op">.</span><span class="fu">FullName</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">if</span> <span class="op">(</span><span class="va">$LASTEXITCODE</span> <span class="op">-</span>ne 0<span class="op">)</span> <span class="op">{</span> <span class="fu">Write-Host</span> <span class="st">&quot;LỖI ở $($migration.Name), dừng lại&quot;</span><span class="op">;</span> <span class="kw">break</span> <span class="op">}</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
 <p>Kiểm tra số bài:</p>
-<div class="sourceCode" id="cb11"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>node <span class="op">--</span>import <span class="op">./</span>scripts<span class="op">/</span>sites<span class="op">-</span>env<span class="op">.</span><span class="fu">mjs</span> <span class="op">./</span>node_modules<span class="op">/</span>wrangler<span class="op">/</span>bin<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">js</span> d1 execute DB <span class="op">--</span>local <span class="op">--</span>config dist<span class="op">/</span>server<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">json</span> <span class="op">--</span>persist<span class="op">-</span>to <span class="op">.</span><span class="fu">wrangler</span><span class="op">/</span>state <span class="op">--</span>command <span class="st">&quot;SELECT COUNT(*) AS so_bai FROM lessons&quot;</span></span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>node <span class="op">--</span>import <span class="op">./</span>scripts<span class="op">/</span>sites<span class="op">-</span>env<span class="op">.</span><span class="fu">mjs</span> <span class="op">./</span>node_modules<span class="op">/</span>wrangler<span class="op">/</span>bin<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">js</span> d1 execute DB <span class="op">--</span>local <span class="op">--</span>config dist<span class="op">/</span>server<span class="op">/</span>wrangler<span class="op">.</span><span class="fu">json</span> <span class="op">--</span>persist<span class="op">-</span>to <span class="op">.</span><span class="fu">wrangler</span><span class="op">/</span>state <span class="op">--</span>command <span class="st">&quot;SELECT COUNT(*) AS so_bai FROM lessons&quot;</span></span></code></pre></div>
 <p>Phải có <code>"so_bai": 10</code>.</p>
 <p><strong>Tham số <code>--persist-to .wrangler/state</code> là bắt
 buộc.</strong> <code>pnpm dev</code> đọc kho tại
@@ -234,8 +284,8 @@ package và báo <code>ERR_INVALID_MODULE_SPECIFIER</code>.</p>
 <p>Không chạy lại migration trên kho đã có dữ liệu. Muốn làm lại từ đầu,
 xóa <code>.wrangler\</code> sau khi người phụ trách xác nhận.</p>
 <h2 id="7-chạy-ứng-dụng">7. Chạy ứng dụng</h2>
-<div class="sourceCode" id="cb12"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>pnpm dev</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>pnpm dev</span></code></pre></div>
 <p>Máy chủ chạy tại <code>http://127.0.0.1:5173</code>. Để cửa sổ
 PowerShell này mở; dừng bằng <code>Ctrl + C</code>.</p>
 <div class="table-wrap"><table>
@@ -263,8 +313,8 @@ PowerShell này mở; dừng bằng <code>Ctrl + C</code>.</p>
 <p>Mở PowerShell thứ hai để kiểm tra API. Trên Windows, dùng
 <code>curl.exe</code> (không phải <code>curl</code>, vốn là alias của
 PowerShell):</p>
-<div class="sourceCode" id="cb13"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">curl</span><span class="op">.</span><span class="fu">exe</span> <span class="op">-</span>s http<span class="op">://</span>127<span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">1</span><span class="op">:</span>5173<span class="op">/</span>api<span class="op">/</span>lessons</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">curl</span><span class="op">.</span><span class="fu">exe</span> <span class="op">-</span>s http<span class="op">://</span>127<span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">0</span><span class="op">.</span><span class="fu">1</span><span class="op">:</span>5173<span class="op">/</span>api<span class="op">/</span>lessons</span></code></pre></div>
 <p>Kết quả đúng: JSON có khóa <code>"lessons"</code> với 10 bài. Thấy
 <code>Chưa thể tải dữ liệu</code> thì quay lại mục 6.</p>
 <p><strong>[Cần xác minh trên Windows]</strong> lệnh
@@ -281,24 +331,34 @@ và lưu ở trình quản lý mật khẩu.</li>
 <p>Từ lần sau, dùng mật khẩu mới. <code>ADMIN_PASSWORD</code> không còn
 tác dụng.</p>
 <h2 id="9-kiểm-thử">9. Kiểm thử</h2>
-<div class="sourceCode" id="cb14"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>npm test</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="fu">echo</span> <span class="st">&quot;Mã thoát: $LASTEXITCODE&quot;</span></span></code></pre></div>
-<p>Kết quả đạt: 27 dòng <code>PASS</code>, mã thoát <code>0</code>. Kiểm
-thử không gọi dịch vụ bên ngoài.</p>
-<p>Chạy riêng một bộ:</p>
-<div class="sourceCode" id="cb15"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>node tests\password<span class="op">-</span>reset<span class="op">.</span><span class="fu">test</span><span class="op">.</span><span class="fu">mjs</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>node tests\migrations<span class="op">.</span><span class="fu">test</span><span class="op">.</span><span class="fu">mjs</span></span></code></pre></div>
-<p>Kiểm tra kiểu TypeScript:</p>
+<p>Kiểm thử PostgreSQL cần biến <code>TEST_DATABASE_URL</code>. Biến này
+chỉ tồn tại trong cửa sổ PowerShell hiện tại; mở cửa sổ mới thì phải đặt
+lại. <strong>Không lưu biến này vào <code>.dev.vars</code> hay tệp nào
+trong dự án.</strong></p>
 <div class="sourceCode" id="cb16"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>pnpm exec tsc <span class="op">--</span>noEmit</span></code></pre></div>
-<h2 id="10-cập-nhật-mã">10. Cập nhật mã</h2>
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="va">$env</span><span class="op">:</span>TEST_DATABASE_URL <span class="op">=</span> <span class="st">&quot;postgres://sontra:&lt;mật-khẩu-thử-nghiệm&gt;@127.0.0.1:5432/sontra_test&quot;</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>npm test</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="fu">echo</span> <span class="st">&quot;Mã thoát: $LASTEXITCODE&quot;</span></span></code></pre></div>
+<p>Kết quả đạt: mã thoát <code>0</code>, có 38 dòng <code>PASS</code>
+(27 kiểm thử SQLite và 11 kiểm thử PostgreSQL).</p>
+<p>Nếu thiếu <code>TEST_DATABASE_URL</code> hoặc PostgreSQL chưa chạy,
+<code>npm test</code> báo lỗi. Đây là chủ đích: không bỏ qua kiểm thử để
+qua.</p>
+<p>Chạy riêng kiểm thử PostgreSQL:</p>
 <div class="sourceCode" id="cb17"><pre
-class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cd</span> <span class="st">&quot;$HOME\Documents\du-an\viber_code&quot;</span></span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>git pull origin Son_tra_so</span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>pnpm install <span class="op">--</span>frozen<span class="op">-</span>lockfile</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>pnpm build</span></code></pre></div>
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>node tests\pg<span class="op">-</span>db<span class="op">.</span><span class="fu">test</span><span class="op">.</span><span class="fu">mjs</span></span></code></pre></div>
+<p>Kiểm tra kiểu TypeScript:</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>pnpm exec tsc <span class="op">--</span>noEmit</span></code></pre></div>
+<p>Lưu ý: lệnh này hiện báo một lỗi có sẵn ở
+<code>app\api\[...path]\route.ts</code> dòng 143. Lỗi này sẽ được sửa
+khi chuyển route sang Vercel.</p>
+<h2 id="10-cập-nhật-mã">10. Cập nhật mã</h2>
+<div class="sourceCode" id="cb19"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cd</span> <span class="st">&quot;$HOME\Documents\du-an\viber_code&quot;</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>git pull origin Son_tra_so</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>pnpm install <span class="op">--</span>frozen<span class="op">-</span>lockfile</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>pnpm build</span></code></pre></div>
 <p>Nếu có migration mới (số lớn hơn <code>0011</code>), chỉ áp dụng các
 tệp mới bằng lệnh mục 6 với tên tệp tương ứng.</p>
 <h2 id="11-sự-cố-thường-gặp">11. Sự cố thường gặp</h2>
@@ -347,23 +407,40 @@ tệp mới bằng lệnh mục 6 với tên tệp tương ứng.</p>
 <td>Chạy lại mục 6 có <code>--persist-to .wrangler/state</code></td>
 </tr>
 <tr class="even">
+<td><code>ECONNREFUSED 127.0.0.1:5432</code> khi
+<code>npm test</code></td>
+<td>Dịch vụ PostgreSQL đang dừng</td>
+<td>Mục 1.4: <code>Start-Service</code> cho dịch vụ
+<code>postgresql-x64-16</code></td>
+</tr>
+<tr class="odd">
+<td><code>Từ chối chạy: tên cơ sở dữ liệu phải kết thúc bằng "_test"</code></td>
+<td><code>TEST_DATABASE_URL</code> trỏ tới cơ sở dữ liệu khác</td>
+<td>Dùng <code>sontra_test</code> như mục 1.4</td>
+</tr>
+<tr class="even">
+<td><code>Thiếu TEST_DATABASE_URL</code></td>
+<td>Chưa đặt biến trong cửa sổ này</td>
+<td>Đặt lại <code>$env:TEST_DATABASE_URL</code> như mục 9</td>
+</tr>
+<tr class="odd">
 <td>Đường dẫn quá dài</td>
 <td>Giới hạn Windows</td>
 <td>Bật Long Path trong Windows, hoặc đặt dự án ở
 <code>C:\dev\viber_code</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>Cổng 5173 bận</td>
 <td>Ứng dụng khác dùng cổng</td>
 <td>Chạy <code>pnpm dev -- --port 5180</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Quên mật khẩu trả 503</td>
 <td>Thiếu biến email hoặc <code>APP_BASE_URL</code> không phải
 https</td>
 <td>Xem mục 4</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>curl</code> trả về đối tượng lạ</td>
 <td>PowerShell alias <code>curl</code></td>
 <td>Dùng <code>curl.exe</code></td>
@@ -377,16 +454,19 @@ https</td>
 <li>Không đổi máy chủ sang <code>0.0.0.0</code>.</li>
 <li>Không đặt dự án trong OneDrive.</li>
 <li>Triển khai lên Cloudflare: xem
-<code>HUONG_DAN_TRIEN_KHAI_CLOUDFLARE.html</code>. Các lệnh
-<code>wrangler</code> trong tài liệu đó chạy được trên PowerShell với
-cùng cú pháp.</li>
+<code>HUONG_DAN_TRIEN_KHAI_CLOUDFLARE.html</code>. Hướng dẫn đó đang chờ
+cập nhật sang Neon và Vercel theo phương án B.</li>
 </ul>
-<p><strong>Trạng thái kiểm chứng:</strong> các lệnh <code>node</code>,
-<code>pnpm</code>, <code>wrangler</code> và cấu trúc migration đã chạy
-trên môi trường Linux (31/10/2026): 12 migration không lỗi, 10 bài,
-<code>pnpm dev</code> trả đủ 10 bài, <code>npm test</code> 27 PASS. Các
-lệnh PowerShell, Notepad, Windows Defender, Long Path và
-<code>curl.exe</code> <strong>chưa chạy trên Windows</strong>.</p>
+<p><strong>Trạng thái kiểm chứng:</strong></p>
+<ul>
+<li>Trên Linux (02/11/2026): 12 migration SQLite không lỗi, 10 bài,
+<code>pnpm dev</code> trả đủ 10 bài, <code>npm test</code> đạt 38 dòng
+PASS khi có PostgreSQL 16 cục bộ, kiểm thử PostgreSQL 10/10.</li>
+<li><strong>Chưa chạy trên Windows:</strong> PowerShell, bộ cài
+PostgreSQL EDB, <code>psql</code>, <code>Get-Service</code>, Notepad,
+Windows Defender, Long Path và <code>curl.exe</code>. Các bước này được
+đánh dấu <strong>[Cần xác minh trên Windows]</strong>.</li>
+</ul>
 
 </main>
 </body>
