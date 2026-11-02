@@ -11,12 +11,13 @@
     "build": "node scripts/run-framework.mjs build",
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "node tests/api.test.mjs && node tests/migrations.test.mjs && node tests/assessment-idempotency.test.mjs && node tests/lessons.test.mjs && node tests/video.test.mjs && node tests/progress.test.mjs && node tests/quiz.test.mjs && node tests/dashboard-rules.test.mjs && node tests/dashboard-queries.test.mjs && node tests/dashboard-api.test.mjs && node tests/admin-page.test.mjs && node tests/staff-service.test.mjs && node tests/assessment-service.test.mjs && node tests/progress-service.test.mjs && node tests/video-service.test.mjs && node tests/video-upload-service.test.mjs && node tests/identity-service.test.mjs && node tests/body-limit.test.mjs && node tests/auth.test.mjs && node tests/news.test.mjs && node tests/password-reset.test.mjs && node tests/lessons-admin.test.mjs",
+    "test": "node tests/api.test.mjs && node tests/migrations.test.mjs && node tests/assessment-idempotency.test.mjs && node tests/lessons.test.mjs && node tests/video.test.mjs && node tests/progress.test.mjs && node tests/quiz.test.mjs && node tests/dashboard-rules.test.mjs && node tests/dashboard-queries.test.mjs && node tests/dashboard-api.test.mjs && node tests/admin-page.test.mjs && node tests/staff-service.test.mjs && node tests/assessment-service.test.mjs && node tests/progress-service.test.mjs && node tests/video-service.test.mjs && node tests/video-upload-service.test.mjs && node tests/identity-service.test.mjs && node tests/body-limit.test.mjs && node tests/auth.test.mjs && node tests/news.test.mjs && node tests/password-reset.test.mjs && node tests/lessons-admin.test.mjs && TEST_DATABASE_URL=\"$TEST_DATABASE_URL\" node tests/pg-db.test.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
     "next": "16.3.4",
+    "pg": "8.23.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "zod": "^3.25.76"
@@ -26,6 +27,7 @@
     "@cloudflare/workers-types": "4.20260515.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/pg": "8.23.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",

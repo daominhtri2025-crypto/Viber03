@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -93,7 +93,9 @@ export async function loadApi(sql, {
 
 // Nạp một module trong shared/ (ví dụ 'video-rules') để kiểm thử đơn vị dùng đúng mã nguồn TypeScript.
 export async function loadShared(name) {
-  const dir = mkdtempSync(join(tmpdir(), 'son-tra-so-shared-'));
+  // Tạo trong node_modules/.cache để gói npm (ví dụ pg) vẫn được phân giải khi nạp module tạm.
+  mkdirSync('node_modules/.cache', { recursive: true });
+  const dir = mkdtempSync(join('node_modules', '.cache', 'son-tra-so-shared-'));
   try {
     for (const file of readdirSync(SHARED_DIR).filter((entry) => entry.endsWith('.ts'))) {
       const source = readFileSync(join(SHARED_DIR, file), 'utf8');
