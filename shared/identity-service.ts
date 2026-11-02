@@ -18,7 +18,7 @@ export async function isStaffEmail(db: IdentityDb, email: string): Promise<boole
   return row !== null;
 }
 
-// Trả mã học viên của danh tính; chưa có thì tạo một lần (INSERT OR IGNORE giữ mã cũ nếu hai yêu cầu đua nhau).
+// Trả mã học viên của danh tính; chưa có thì tạo một lần (ON CONFLICT DO NOTHING giữ mã cũ nếu hai yêu cầu đua nhau).
 // newCode chỉ được gọi khi thật sự cần tạo, để không sinh mã thừa cho học viên đã có.
 export async function ensureLearnerCode(
   db: IdentityDb,
@@ -28,7 +28,7 @@ export async function ensureLearnerCode(
 ): Promise<string> {
   const existing = await db.prepare('SELECT code FROM learners WHERE id=?').bind(learnerId).first<{ code: string }>();
   if (existing) return existing.code;
-  await db.prepare('INSERT OR IGNORE INTO learners(id,code,created) VALUES(?,?,?)').bind(learnerId, newCode(), now).run();
+  await db.prepare('INSERT INTO learners(id,code,created) VALUES(?,?,?) ON CONFLICT DO NOTHING').bind(learnerId, newCode(), now).run();
   const stored = await db.prepare('SELECT code FROM learners WHERE id=?').bind(learnerId).first<{ code: string }>();
   if (!stored) throw new Error('learner missing');
   return stored.code;

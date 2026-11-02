@@ -129,7 +129,7 @@ async function ownerLogin(db: AuthDb, password: string, adminPassword: string | 
     if (!adminPassword) return { kind: 'unavailable' };
     if (!constantTimeEqualText(password, adminPassword)) return { kind: 'invalid' };
     await db
-      .prepare('INSERT OR IGNORE INTO accounts(id,email,full_name,password_hash,active,must_change,failed_attempts,locked_until,created,updated) VALUES(?,?,NULL,?,1,0,0,NULL,?,?)')
+      .prepare('INSERT INTO accounts(id,email,full_name,password_hash,active,must_change,failed_attempts,locked_until,created,updated) VALUES(?,?,NULL,?,1,0,0,NULL,?,?) ON CONFLICT DO NOTHING')
       .bind(OWNER_ACCOUNT_ID, OWNER_ACCOUNT_EMAIL, await hashPassword(password), now, now)
       .run();
     row = await findAccount(db, OWNER_ACCOUNT_ID);
@@ -241,7 +241,7 @@ export async function createAccount(
     .prepare('INSERT INTO accounts(id,email,full_name,password_hash,active,must_change,failed_attempts,locked_until,created,updated) VALUES(?,?,?,?,1,1,0,NULL,?,?)')
     .bind(newId, input.email, input.fullName, await hashPassword(input.password), now, now)
     .run();
-  await db.prepare('INSERT OR IGNORE INTO staff(email,created) VALUES(?,?)').bind(input.email, now).run();
+  await db.prepare('INSERT INTO staff(email,created) VALUES(?,?) ON CONFLICT DO NOTHING').bind(input.email, now).run();
   return 'created';
 }
 

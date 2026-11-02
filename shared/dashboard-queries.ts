@@ -1,6 +1,6 @@
 // Truy vấn báo cáo quản trị (Bước 3; FR-DSH-01 đến 07; NFR-PERF-03: 500 học viên, dưới 1 giây).
-// Chỉ dùng cú pháp SQL chuẩn để chạy trên cả D1 và SQLite: strftime, COUNT, SUM, COUNT(DISTINCT ...),
-// CASE, GROUP BY trên truy vấn con. Không dùng hàm riêng của một engine.
+// Chỉ dùng cú pháp SQL chuẩn để chạy trên PostgreSQL và SQLite: COUNT, SUM, COUNT(DISTINCT ...), CASE, GROUP BY.
+// Hàm ngày theo múi giờ không đặt trong SQL: gom theo ngày địa phương trong JavaScript (localDay), tránh phụ thuộc engine.
 // Mốc thời gian lưu theo toISOString() (có mili giây, kết thúc bằng Z), nên so sánh chuỗi đúng thứ tự.
 // Gom nhóm nằm trong SQL để không tải từng lượt làm vào bộ nhớ khi số lượt tăng.
 import {
@@ -58,8 +58,12 @@ export interface DashboardSnapshot {
   assessmentTotals: { total: number; achieved: number };
 }
 
-// Modifier múi giờ dạng tham số (không ghép chuỗi SQL). Ví dụ: "+420 minutes".
-const OFFSET_MODIFIER = `${REPORT_UTC_OFFSET_MINUTES >= 0 ? '+' : ''}${REPORT_UTC_OFFSET_MINUTES} minutes`;
+// Ngày địa phương (YYYY-MM-DD) của mốc ISO UTC. Mốc hỏng trả null và bị bỏ ở nơi gọi, như strftime trả NULL.
+export function localDay(isoUtc: string, offsetMinutes: number): string | null {
+  const millis = Date.parse(isoUtc);
+  if (Number.isNaN(millis)) return null;
+  return new Date(millis + offsetMinutes * 60_000).toISOString().slice(0, 10);
+}
 
 // Kiểm tra và chuẩn hóa bộ lọc. Đầu vào sai bị từ chối bằng lỗi, không im lặng bỏ qua.
 export function normalizeFilter(input: Partial<ReportFilter> = {}): ReportFilter {
@@ -162,32 +166,43 @@ export async function queryLessonCompletions(db: Db, filter: ReportFilter): Prom
 export async function queryDailyAttempts(db: Db, filter: ReportFilter): Promise<DailyAttempt[]> {
   const t = timeClause('created', filter);
   const s = lessonClause(filter);
-  const rows = await run<{ day: string | null; attempts: number; correct: number | null }>(
+  const rows = await run<{ created: string; correct: number }>(
     db,
-    `SELECT day, COUNT(*) AS attempts, SUM(correct) AS correct FROM (` +
-      `SELECT strftime('%Y-%m-%d', created, ?) AS day, correct FROM quiz_attempts WHERE 1 = 1${t.sql}${s.sql}` +
-      `) GROUP BY day`,
-    [OFFSET_MODIFIER, ...t.values, ...s.values],
+    `SELECT created, correct FROM quiz_attempts WHERE 1 = 1${t.sql}${s.sql}`,
+    [...t.values, ...s.values],
   );
-  return rows
-    .filter((row): row is typeof row & { day: string } => row.day !== null)
-    .map((row) => ({ day: row.day, attempts: Number(row.attempts), correct: Number(row.correct ?? 0) }));
+  const buckets = new Map<string, { attempts: number; correct: number }>();
+  for (const row of rows) {
+    const day = localDay(row.created, REPORT_UTC_OFFSET_MINUTES);
+    if (day === null) continue;
+    const bucket = buckets.get(day) ?? { attempts: 0, correct: 0 };
+    bucket.attempts += 1;
+    bucket.correct += Number(row.correct ?? 0);
+    buckets.set(day, bucket);
+  }
+  return [...buckets.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([day, bucket]) => ({ day, attempts: bucket.attempts, correct: bucket.correct }));
 }
 
 // Hoàn thành theo ngày địa phương, dùng completed_at làm mốc (không dùng progress.updated).
 export async function queryDailyCompletions(db: Db, filter: ReportFilter): Promise<DailyCompletion[]> {
   const t = timeClause('completed_at', filter);
   const s = lessonClause(filter);
-  const rows = await run<{ day: string | null; completions: number }>(
+  const rows = await run<{ completed_at: string }>(
     db,
-    `SELECT day, COUNT(*) AS completions FROM (` +
-      `SELECT strftime('%Y-%m-%d', completed_at, ?) AS day FROM progress WHERE done = 1 AND completed_at IS NOT NULL${t.sql}${s.sql}` +
-      `) GROUP BY day`,
-    [OFFSET_MODIFIER, ...t.values, ...s.values],
+    `SELECT completed_at FROM progress WHERE done = 1 AND completed_at IS NOT NULL${t.sql}${s.sql}`,
+    [...t.values, ...s.values],
   );
-  return rows
-    .filter((row): row is typeof row & { day: string } => row.day !== null)
-    .map((row) => ({ day: row.day, completions: Number(row.completions) }));
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const day = localDay(row.completed_at, REPORT_UTC_OFFSET_MINUTES);
+    if (day === null) continue;
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([day, completions]) => ({ day, completions }));
 }
 
 // Kết quả kiểm tra theo học viên: số bài đã làm và số bài có ít nhất một lượt đúng.

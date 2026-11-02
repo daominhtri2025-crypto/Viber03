@@ -65,7 +65,7 @@ export async function syncProgress(db: ProgressDb, learnerId: string, read: numb
     indices.map((lesson) =>
       db
         .prepare(
-          'INSERT INTO progress(learner,lesson,read,done,updated,completed_at) VALUES(?,?,?,?,?,?) ON CONFLICT(learner,lesson) DO UPDATE SET read=MAX(read,excluded.read),done=MAX(done,excluded.done),updated=excluded.updated,completed_at=CASE WHEN progress.done=0 AND excluded.done=1 THEN excluded.completed_at ELSE progress.completed_at END',
+          'INSERT INTO progress(learner,lesson,read,done,updated,completed_at) VALUES(?,?,?,?,?,?) ON CONFLICT(learner,lesson) DO UPDATE SET read=CASE WHEN progress.read>=excluded.read THEN progress.read ELSE excluded.read END,done=CASE WHEN progress.done>=excluded.done THEN progress.done ELSE excluded.done END,updated=excluded.updated,completed_at=CASE WHEN progress.done=0 AND excluded.done=1 THEN excluded.completed_at ELSE progress.completed_at END',
         )
         .bind(learnerId, lesson, read.includes(lesson) ? 1 : 0, done.includes(lesson) ? 1 : 0, now, done.includes(lesson) ? now : null),
     ),
@@ -77,7 +77,7 @@ export async function syncProgress(db: ProgressDb, learnerId: string, read: numb
 export async function recordQuizPass(db: ProgressDb, learnerId: string, lesson: number, now: string): Promise<void> {
   await db
     .prepare(
-      'INSERT INTO progress(learner,lesson,read,done,score,updated,completed_at) VALUES(?,?,0,0,1,?,NULL) ON CONFLICT(learner,lesson) DO UPDATE SET score=MAX(progress.score,excluded.score)',
+      'INSERT INTO progress(learner,lesson,read,done,score,updated,completed_at) VALUES(?,?,0,0,1,?,NULL) ON CONFLICT(learner,lesson) DO UPDATE SET score=CASE WHEN progress.score>=excluded.score THEN progress.score ELSE excluded.score END',
     )
     .bind(learnerId, lesson, now)
     .run();

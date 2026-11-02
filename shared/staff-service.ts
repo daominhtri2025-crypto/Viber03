@@ -25,11 +25,11 @@ export function validateStaffChange(input: unknown): StaffChange {
   return { ok: true, email: body.email.toLowerCase().trim(), remove: Boolean(body.remove) };
 }
 
-// Thêm hoặc thu hồi quyền đánh giá. Thêm lại email đã có không tạo bản ghi mới (INSERT OR IGNORE).
+// Thêm hoặc thu hồi quyền đánh giá. Thêm lại email đã có không tạo bản ghi mới (ON CONFLICT DO NOTHING).
 export async function applyStaffChange(db: StaffDb, change: { email: string; remove: boolean }, now: string): Promise<void> {
   if (change.remove) {
     await db.prepare('DELETE FROM staff WHERE email=?').bind(change.email).run();
   } else {
-    await db.prepare('INSERT OR IGNORE INTO staff(email,created) VALUES(?,?)').bind(change.email, now).run();
+    await db.prepare('INSERT INTO staff(email,created) VALUES(?,?) ON CONFLICT DO NOTHING').bind(change.email, now).run();
   }
 }
